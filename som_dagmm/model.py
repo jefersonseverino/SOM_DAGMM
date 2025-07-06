@@ -19,10 +19,7 @@ class SOM_DAGMM(nn.Module):
         winners = [som.winner(i) for i in input]
         winners = torch.tensor([normalize_tuple(winners[i], 10) for i in range(len(winners))], dtype=torch.float32)
         return self.dagmm(input, winners)
-
-
-
-        
+       
         
 class DAGMM(nn.Module):
     def __init__(self, compression_module, estimation_module, gmm_module):

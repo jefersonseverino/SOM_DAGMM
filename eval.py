@@ -32,7 +32,7 @@ def parse_args():
     return args
 
 args = parse_args()
-save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed)
+save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
 #read data
 # get labels from dataset and drop them if available
 if args.dataset == 'credit_card':

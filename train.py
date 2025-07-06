@@ -19,6 +19,7 @@ from som_dagmm.estimation_network import EstimationNetwork
 from som_dagmm.gmm import GMM, Mixture
 
 from SOM import som_train, som_pred
+import tqdm
 
 
 def parse_args():
@@ -35,10 +36,9 @@ def parse_args():
 args = parse_args()
 epochs = args.epoch
 batch_size = args.batch_size
-save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed)
+save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
 #read data
 # get labels from dataset and drop them if available
-
 
 if args.dataset == 'credit_card':
     data = load_data('data/CreditCardFraud/creditcard.csv')
@@ -99,7 +99,7 @@ optimizer =  optim.Adam(net.parameters(), lr=1e-4)
 for epoch in range(epochs):
     print('EPOCH {}:'.format(epoch + 1))
     running_loss = 0
-    for i, data in enumerate(dataloader):
+    for i, data in enumerate(tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}")):
         out = net(data[0])
         optimizer.zero_grad()
         L_loss = compression.reconstruction_loss(data[0])
