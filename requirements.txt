@@ -2,3 +2,5 @@ torch
 pandas
 scikit-learn
 numpy
+tqdm
+minisom

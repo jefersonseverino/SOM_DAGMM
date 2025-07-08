@@ -33,6 +33,7 @@ def parse_args():
 
 args = parse_args()
 save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
+batch_size = 1024
 #read data
 # get labels from dataset and drop them if available
 if args.dataset == 'credit_card':
@@ -77,20 +78,17 @@ test_data = torch.tensor(test_data.values.astype(np.float32))
 
 #Convert tensor to TensorDataset class.
 dataset = TensorDataset(data)
+train_dataset = TensorDataset(train_data)
+test_dataset = TensorDataset(test_data)
 
 #TrainLoader
-dataloader = DataLoader(dataset, batch_size= 1024, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-
-
-compression = CompressionNetwork(data.shape[1])
-estimation = EstimationNetwork()
-gmm = GMM(2,6)
-mix = Mixture(6)
-dagmm = DAGMM(compression, estimation, gmm)
-net = SOM_DAGMM(dagmm)
+net = torch.load(save_path, weights_only=False)
 net.eval()
-out = net(data)
+out = net(test_data)
 threshold = np.percentile(out, 20)
 pred = (out > threshold).numpy().astype(int)
 

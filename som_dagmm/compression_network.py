@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 
-class CompressionNetwork(nn.Module ):
+class CompressionNetwork(nn.Module):
     """Defines a compression network."""
     def __init__(self, size):
         super().__init__()

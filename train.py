@@ -83,11 +83,13 @@ test_data = torch.tensor(test_data.values.astype(np.float32))
 
 #Convert tensor to TensorDataset class.
 dataset = TensorDataset(data)
+train_dataset = TensorDataset(train_data)
+test_dataset = TensorDataset(test_data)
 
 #TrainLoader
-dataloader = DataLoader(dataset, batch_size= batch_size, shuffle=True)
-
-
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 compression = CompressionNetwork(data.shape[1])
 estimation = EstimationNetwork()
@@ -96,10 +98,11 @@ mix = Mixture(6)
 dagmm = DAGMM(compression, estimation, gmm)
 net = SOM_DAGMM(dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)
+
 for epoch in range(epochs):
     print('EPOCH {}:'.format(epoch + 1))
     running_loss = 0
-    for i, data in enumerate(tqdm.tqdm(dataloader, desc=f"Epoch {epoch + 1}")):
+    for i, data in enumerate(tqdm.tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")):
         out = net(data[0])
         optimizer.zero_grad()
         L_loss = compression.reconstruction_loss(data[0])
@@ -109,7 +112,5 @@ for epoch in range(epochs):
         optimizer.step()
         running_loss += loss.item()
     print(running_loss)
+
 torch.save(net, save_path)
-
-
-
