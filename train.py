@@ -19,6 +19,7 @@ from som_dagmm.estimation_network import EstimationNetwork
 from som_dagmm.gmm import GMM, Mixture
 
 from SOM import som_train, som_pred
+from sklearn.model_selection import train_test_split
 import tqdm
 
 
@@ -40,13 +41,6 @@ save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed +
 #read data
 # get labels from dataset and drop them if available
 
-if args.dataset == 'credit_card':
-    data = load_data('data/CreditCardFraud/creditcard.csv')
-    Y = get_labels(data, args.dataset)
-if args.dataset == 'arrhythmia':
-    data = load_data('data/arrhythmia.csv')
-    data = remove_cols(data, ['J'])
-    Y = get_labels(data, args.dataset)
 if args.dataset == 'kdd':
     names = [i for i in range(0,43)]
     data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
@@ -65,13 +59,12 @@ if args.embed == 'one_hot':
 if args.embed == 'label_encode':
     data = label_encoding(data, categorical_cols)
 
-
 # Remove columns with NA values
 data = fill_na(data)
 # normalize data
 data = normalize_cols(data)
 #test and train split
-train_data, test_data, Y_train, Y_test = split_data(data, Y, 0.8)
+train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
 
 #train_data = train_data.values.astype(np.float32)
 print(train_data.shape)
