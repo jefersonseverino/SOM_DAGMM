@@ -24,7 +24,6 @@ import tqdm
 
 
 def parse_args():
-    
     parser = argparse.ArgumentParser(description='Anomaly Detection with unsupervised methods')
     parser.add_argument('--dataset', dest='dataset', help='training dataset', default='vehicle_claims', type=str)
     parser.add_argument('--embedding', dest='embed', help='one_hot, label', default='NULL', type=str)
@@ -38,59 +37,78 @@ args = parse_args()
 epochs = args.epoch
 batch_size = args.batch_size
 save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
-#read data
-# get labels from dataset and drop them if available
 
-if args.dataset == 'kdd':
-    names = [i for i in range(0,43)]
-    data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-    categorical_cols = [1,2,3,4]
-    Y = get_labels(data, args.dataset)
-
-#Select features
-if args.features == "categorical":
-    data = data[categorical_cols]
-if args.features == "numerical":
-    data = remove_cols(data, categorical_cols)
-
+names = [i for i in range(0,43)]
+data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
+categorical_cols = [1,2,3,4]
+data_benign = data[data[41] == "normal"].copy()
+data_malicious = data[data[41] != "normal"].copy()
+Y_benign, data_benign = get_labels(data_benign, args.dataset)
+Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
+ 
 #encode categorical variables 
 if args.embed == 'one_hot':
-    data = one_hot_encoding(data, categorical_cols)
+    # data = one_hot_encoding(data, categorical_cols)
+    data_benign = one_hot_encoding(data_benign, categorical_cols)
+    data_malicious = one_hot_encoding(data_malicious, categorical_cols)
 if args.embed == 'label_encode':
-    data = label_encoding(data, categorical_cols)
+    # data = label_encoding(data, categorical_cols)
+    data_benign = label_encoding(data_benign, categorical_cols)
+    data_malicious = label_encoding(data_malicious, categorical_cols)
 
 # Remove columns with NA values
-data = fill_na(data)
+# data = fill_na(data)
+data_benign = fill_na(data_benign)
+data_malicious = fill_na(data_malicious)
+
 # normalize data
-data = normalize_cols(data)
+# data = normalize_cols(data)
+data_benign = normalize_cols(data_benign)
+data_malicious = normalize_cols(data_malicious)
+
 #test and train split
-train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
+# train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
+train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.4)
+# Split again for validation and test
+val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5)
+
+# Split malicious data only for validation and test
+val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5)
+
+# Concatenate benign and malicious data for validation and test
+val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
+test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
+
+# Concatenate Y
+Y_val = np.concatenate([Y_val, Y_val_mal])
+Y_test = np.concatenate([Y_test, Y_test_mal])
 
 #train_data = train_data.values.astype(np.float32)
 print(train_data.shape)
 
 #Convert to torch tensors
-data = torch.tensor(data.values.astype(np.float32))
 train_data = torch.tensor(train_data.values.astype(np.float32))
+val_data = torch.tensor(val_data.values.astype(np.float32))
 test_data = torch.tensor(test_data.values.astype(np.float32))
 
 #Convert tensor to TensorDataset class.
-dataset = TensorDataset(data)
 train_dataset = TensorDataset(train_data)
+val_dataset = TensorDataset(val_data)
 test_dataset = TensorDataset(test_data)
 
 #TrainLoader
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-compression = CompressionNetwork(data.shape[1])
+compression = CompressionNetwork(train_data.shape[1])
 estimation = EstimationNetwork()
 gmm = GMM(2,6)
 mix = Mixture(6)
 dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
+# Use pretrained SOM
 som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
 
 net = SOM_DAGMM(som, dagmm)
@@ -108,6 +126,17 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
-    print(running_loss)
+    net.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for val_batch in val_dataloader:
+            val_input = val_batch[0]
+            val_out = net(val_input)
+            val_L_loss = compression.reconstruction_loss(val_input)
+            val_G_loss = mix.gmm_loss(out=val_out, L1=0.1, L2=0.005)
+            val_total_loss = val_L_loss + val_G_loss
+            val_loss += val_total_loss.item()
+    print(f"Validation - Epoch {epoch+1} - Loss: {val_loss:.4f}")
+    net.train()
 
 torch.save(net, save_path)

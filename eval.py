@@ -38,48 +38,64 @@ save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed +
 batch_size = 1024
 #read data
 # get labels from dataset and drop them if available
-if args.dataset == 'kdd':
-    names = [i for i in range(0,43)]
-    data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-    categorical_cols = [1,2,3,4]
-    Y = get_labels(data, args.dataset)
-
-#Select features
-if args.features == "categorical":
-    data = data[categorical_cols]
-if args.features == "numerical":
-    data = remove_cols(data, categorical_cols)
-
+names = [i for i in range(0,43)]
+data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
+categorical_cols = [1,2,3,4]
+data_benign = data[data[41] == "normal"]
+data_malicious = data[data[41] != "normal"]
+Y_benign, data_benign = get_labels(data_benign, args.dataset)
+Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
+ 
 #encode categorical variables 
 if args.embed == 'one_hot':
-    data = one_hot_encoding(data, categorical_cols)
+    # data = one_hot_encoding(data, categorical_cols)
+    data_benign = one_hot_encoding(data_benign, categorical_cols)
+    data_malicious = one_hot_encoding(data_malicious, categorical_cols)
 if args.embed == 'label_encode':
-    data = label_encoding(data, categorical_cols)
+    # data = label_encoding(data, categorical_cols)
+    data_benign = label_encoding(data_benign, categorical_cols)
+    data_malicious = label_encoding(data_malicious, categorical_cols)
 
 # Remove columns with NA values
-data = fill_na(data)
+# data = fill_na(data)
+data_benign = fill_na(data_benign)
+data_malicious = fill_na(data_malicious)
+
 # normalize data
-data = normalize_cols(data)
+# data = normalize_cols(data)
+data_benign = normalize_cols(data_benign)
+data_malicious = normalize_cols(data_malicious)
 
 #test and train split
-train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
+# train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
+train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.4)
+# Split again for validation and test
+val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5)
 
-#train_data = train_data.values.astype(np.float32)
-print(train_data.shape)
+# Split malicious data only for validation and test
+val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5)
+
+# Concatenate benign and malicious data for validation and test
+val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
+test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
+
+# Concatenate Y
+Y_val = np.concatenate((Y_val, Y_val_mal), axis=0)
+Y_test = np.concatenate((Y_test, Y_test_mal), axis=0)
 
 #Convert to torch tensors
-data = torch.tensor(data.values.astype(np.float32))
 train_data = torch.tensor(train_data.values.astype(np.float32))
+val_data = torch.tensor(val_data.values.astype(np.float32))
 test_data = torch.tensor(test_data.values.astype(np.float32))
 
 #Convert tensor to TensorDataset class.
-dataset = TensorDataset(data)
 train_dataset = TensorDataset(train_data)
+val_dataset = TensorDataset(val_data)
 test_dataset = TensorDataset(test_data)
 
 #TrainLoader
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 net = torch.load(save_path, weights_only=False)
@@ -89,5 +105,5 @@ threshold = np.percentile(out, 20)
 pred = (out > threshold).numpy().astype(int)
 
 # Precision, Recall, F1
-p, r, f, a = get_scores(pred, Y_test)
-print("Precision:", p, "Recall:", r, "F1 Score:", f, "AUROC:", a)
+acc, p, r, f, a = get_scores(pred, Y_test)
+print("Accuracy:", acc, "Precision:", p, "Recall:", r, "F1 Score:", f, "AUROC:", a)

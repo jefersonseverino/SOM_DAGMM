@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from sklearn import preprocessing
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import confusion_matrix
 from sklearn import metrics
 
@@ -25,39 +25,37 @@ def one_hot_encoding(data, cols):
     data = pd.concat([data, encoded_data], axis=1)
     return data
 
+
 def label_encoding(data, cols):
-    encode_data = data[cols]
-    encoded_data = pd.DataFrame()
+    data_copy = data.copy()
     encoder = preprocessing.LabelEncoder()
-    for column in encode_data:
-        new_data = encoder.fit_transform(encode_data[column])
-        new_data = pd.DataFrame(new_data, columns=[column])
-        encoded_data = pd.concat([encoded_data, new_data], axis=1)
-    data.drop(cols, axis=1, inplace=True)
-    data = pd.concat([data, encoded_data], axis=1)
-    return data
+    for column in cols:
+        if column in data_copy.columns:
+            data_copy[column] = encoder.fit_transform(data_copy[column])
+    return data_copy
 
 def get_labels(data, name):
+    data = data.copy()  # Evita o SettingWithCopyWarning
     if name == 'credit_card':
         label = data['Class']
-        data.drop(['Class'], axis = 1, inplace=True)        
-    if name == 'arrhythmia':
+        data = data.drop(['Class'], axis=1)
+    elif name == 'arrhythmia':
         label = data['class']
-        label = (np.where(label == (3|4|5|7|8|9|14|15), 0, 1))
-        data.drop(['class'], axis = 1, inplace=True)
-    if name == 'kdd':
-        label = data[41]
-        label = np.where(label == "normal", 0, 1)
-        data.drop([41], axis = 1, inplace=True) 
-    return label
+        label = np.where(label.isin([3, 4, 5, 7, 8, 9, 14, 15]), 0, 1)
+        data = data.drop(['class'], axis=1)
+    elif name == 'kdd':
+        label = np.where(data[41] == "normal", 0, 1)
+        data = data.drop([41], axis=1)
+    return label, data
 
 def get_scores(y_pred, y):
+    acc = accuracy_score(y_pred, y)
     precision = precision_score(y_pred, y, average='binary')
     recall = recall_score(y_pred, y, average='binary')
     f1 = f1_score(y_pred, y, average='binary')
     fpr, tpr, thresholds = metrics.roc_curve(y, y_pred, pos_label=1)
     auc = metrics.auc(fpr, tpr)
-    return precision, recall, f1, auc
+    return acc, precision, recall, f1, auc
 
 def get_confusion_matrix(y_pred, y):
     tn, fp, fn, tp = confusion_matrix(y_pred, y).ravel()
