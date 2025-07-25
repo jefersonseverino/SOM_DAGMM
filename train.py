@@ -89,7 +89,11 @@ estimation = EstimationNetwork()
 gmm = GMM(2,6)
 mix = Mixture(6)
 dagmm = DAGMM(compression, estimation, gmm)
-net = SOM_DAGMM(dagmm)
+
+train_np = train_data.numpy()
+som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
+
+net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)
 
 for epoch in range(epochs):

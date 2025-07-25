@@ -1,22 +1,18 @@
 """Implements all the components of the DAGMM model."""
 
 import torch
-import numpy as np
 from torch import nn
-from minisom import MiniSom
-from SOM import som_train
-
 
 eps = torch.autograd.Variable(torch.FloatTensor([1.e-8]), requires_grad=False)
 
 class SOM_DAGMM(nn.Module):
-    def __init__(self, dagmm):
+    def __init__(self, som, dagmm):
         super().__init__()
         self.dagmm = dagmm
+        self.som = som
 
     def forward(self, input):
-        som = som_train(input)
-        winners = [som.winner(i) for i in input]
+        winners = [self.som.winner(i) for i in input]
         winners = torch.tensor([normalize_tuple(winners[i], 10) for i in range(len(winners))], dtype=torch.float32)
         return self.dagmm(input, winners)
        
