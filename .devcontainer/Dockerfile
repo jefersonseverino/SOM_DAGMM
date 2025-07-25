@@ -3,9 +3,10 @@
 
 FROM nvidia/cuda:11.8.0-base-ubuntu22.04
 
-ENV PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.10
+ENV PYTHON_VERSION=${PYTHON_VERSION}
 
-ENV PATH /opt/conda/bin:$PATH
+ENV PATH=/opt/conda/bin:$PATH
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib"
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib"
 
@@ -30,8 +31,12 @@ RUN apt install -y bash \
 ADD https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh miniconda3.sh
 RUN /bin/bash miniconda3.sh -b -p /opt/conda \
     && rm miniconda3.sh \
-    && /opt/conda/bin/conda install -y -c anaconda \
-    python=$PYTHON_VERSION \
+    && /opt/conda/bin/conda config --set ssl_verify False \
+    && /opt/conda/bin/conda config --add channels https://repo.anaconda.com/pkgs/main \
+    && /opt/conda/bin/conda config --add channels https://repo.anaconda.com/pkgs/r \
+    && /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+    && /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r \
+    && /opt/conda/bin/conda install -y -c anaconda python=${PYTHON_VERSION} \
     && /opt/conda/bin/conda clean -ya
 
 RUN /opt/conda/bin/conda config --set ssl_verify False \
