@@ -15,13 +15,13 @@ KDD - https://www.unb.ca/cic/datasets/nsl.html
 
 train.py [-h] [--dataset DATASET] [--embedding EMBED] [--features FEATURES] [--embed EMBEDDING] [--batch_size BATCH_SIZE]
 
-` python train.py --dataset kdd --embed label_encode --features numerical --epoch 100 --batch_size 1024`
+` python src/train.py --dataset kdd --embed label_encode --epoch 100 --batch_size 1024`
 
 ## Evaluation
 
 eval.py [-h] [--dataset DATASET] [--embedding EMBED] [--features FEATURES] [--threshold THRESHOLD]
 
-` python eval.py --dataset kdd --embed label_encode --features numerical --threshold 20`
+` python src/eval.py --dataset kdd --embed label_encode --threshold 20`
 
 ## References
 
