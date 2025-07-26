@@ -1,0 +1,8 @@
+python src/eval.py --dataset kdd --embed label_encode --threshold 20 --contamination 0.1
+Accuracy: 0.8605086013462977 Precision: 0.9819887429643527 Recall: 0.8410611505536565 F1 Score: 0.9060778697554374 AUROC: 0.7890491639686268
+
+python src/eval.py --dataset kdd --embed label_encode --threshold 20 --contamination 0.05
+Accuracy: 0.8714472700074795 Precision: 0.989971004605151 Recall: 0.8478978584158705 F1 Score: 0.9134430770199238 AUROC: 0.8017269084945718
+
+python src/eval.py --dataset kdd --embed label_encode --threshold 20 --contamination 0.01
+Accuracy: 0.8842557965594615 Precision: 0.9993177554153164 Recall: 0.8559032342887194 F1 Score: 0.9220672940732114 AUROC: 0.816571788836918
