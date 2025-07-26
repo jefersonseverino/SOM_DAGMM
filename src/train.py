@@ -114,6 +114,11 @@ som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)
 
+best_val_loss = 100
+count_since_better_loss = 0
+MAX_ATTEMPT = 5
+OFFSET = 0.5
+
 for epoch in range(epochs):
     print('EPOCH {}:'.format(epoch + 1))
     running_loss = 0
@@ -137,6 +142,19 @@ for epoch in range(epochs):
             val_total_loss = val_L_loss + val_G_loss
             val_loss += val_total_loss.item()
     print(f"Validation - Epoch {epoch+1} - Loss: {val_loss:.4f}")
+
+    if val_loss < best_val_loss - OFFSET:
+        print(f"New best validation loss: {val_loss:.4f}")
+        best_val_loss = val_loss
+        count_since_better_loss = 0
+        best_net = net
+    else:
+        count_since_better_loss += 1
+        print(f"Trys since better loss: {count_since_better_loss}")
+        if count_since_better_loss > MAX_ATTEMPT:
+            print(f"Early stop")
+            break
+
     net.train()
 
-torch.save(net, save_path)
+torch.save(best_net, save_path)
