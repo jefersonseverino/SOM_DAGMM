@@ -20,7 +20,7 @@ from som_dagmm.gmm import GMM, Mixture
 
 from SOM import som_train, som_pred
 from sklearn.model_selection import train_test_split
-import tqdm
+import tqdm, copy
 
 
 def parse_args():
@@ -114,6 +114,11 @@ som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)
 
+OFFSET = 0.2
+MAX_ATTEMPT = 5
+best_val_loss = 100
+count_since_better_loss = 0
+
 for epoch in range(epochs):
     print('EPOCH {}:'.format(epoch + 1))
     running_loss = 0
@@ -135,8 +140,23 @@ for epoch in range(epochs):
             val_L_loss = compression.reconstruction_loss(val_input)
             val_G_loss = mix.gmm_loss(out=val_out, L1=0.1, L2=0.005)
             val_total_loss = val_L_loss + val_G_loss
-            val_loss += val_total_loss.item()
+            val_loss += val_total_loss.item() if torch.isfinite(val_total_loss) else 0
     print(f"Validation - Epoch {epoch+1} - Loss: {val_loss:.4f}")
+
+    if val_loss < best_val_loss - OFFSET:
+        print(f"New best validation loss: {val_loss:.4f}")
+        best_val_loss = val_loss
+        count_since_better_loss = 0
+        best_net = copy.deepcopy(net.state_dict())
+    else:
+        count_since_better_loss += 1
+        print(f"    Sem melhoras. Tentativa: {count_since_better_loss} de {MAX_ATTEMPT}")
+        if count_since_better_loss >= MAX_ATTEMPT:
+            print(f"Convergência após {epoch} iterações.")
+            break
+    
     net.train()
 
+net.load_state_dict(best_net)
+net.train()
 torch.save(net, save_path)
