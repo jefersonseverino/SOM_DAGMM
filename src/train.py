@@ -30,13 +30,14 @@ def parse_args():
     parser.add_argument('--features', dest='features', help='all, numerical, categorical', default='all', type=str)
     parser.add_argument('--batch_size', dest='batch_size', help='32', default = 32, type=int)
     parser.add_argument('--epoch', dest='epoch', help='1', default='1', type=int)
+    parser.add_argument('--contamination', dest='contamination', help='0.1', default=0.0, type=float)
     args = parser.parse_args()
     return args
 
 args = parse_args()
 epochs = args.epoch
 batch_size = args.batch_size
-save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
+save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + "_" + str(args.contamination) + ".pt")
 
 names = [i for i in range(0,43)]
 data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
@@ -83,9 +84,31 @@ test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
 Y_val = np.concatenate([Y_val, Y_val_mal])
 Y_test = np.concatenate([Y_test, Y_test_mal])
 
-#train_data = train_data.values.astype(np.float32)
-print(train_data.shape)
+if args.contamination > 0:
+    train_data = train_data.reset_index(drop=True)
+    val_data = val_data.reset_index(drop=True)
+    
+    malicious_index = np.where(Y_val == 1)[0]
+    benign_index = np.where(Y_train == 0)[0]
+    n_samples = int(len(train_data) * args.contamination)
+    selected_malicious_index = np.random.choice(malicious_index, n_samples, replace=False)
+    selected_benign_index = np.random.choice(benign_index, n_samples, replace=False)
+    
+    benign_data = train_data.iloc[selected_benign_index]
+    malicious_data = val_data.iloc[selected_malicious_index]
 
+    train_data = train_data.drop(index=selected_benign_index).reset_index(drop=True)
+    val_data = val_data.drop(index=selected_malicious_index).reset_index(drop=True)
+    
+    Y_train = np.delete(Y_train, selected_benign_index)
+    Y_val = np.delete(Y_val, selected_malicious_index)
+
+    train_data = pd.concat([train_data, malicious_data], ignore_index=True)
+    Y_train = np.concatenate([Y_train, np.ones(len(malicious_data))])
+
+    val_data = pd.concat([val_data, benign_data], ignore_index=True)
+    Y_val = np.concatenate([Y_val, np.zeros(len(benign_data))])
+    
 #Convert to torch tensors
 train_data = torch.tensor(train_data.values.astype(np.float32))
 val_data = torch.tensor(val_data.values.astype(np.float32))

@@ -30,11 +30,12 @@ def parse_args():
     parser.add_argument('--embedding', dest='embed', help='one_hot, label', default='NULL', type=str)
     parser.add_argument('--features', dest='features', help='all, numerical, categorical', default='all', type=str)
     parser.add_argument('--threshold', dest='threshold', help='32', default = 20, type=int)
+    parser.add_argument('--contamination', dest='contamination', help='0.1', default=0.0, type=float)
     args = parser.parse_args()
     return args
 
 args = parse_args()
-save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
+save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + "_" + str(args.contamination) + ".pt")
 batch_size = 1024
 #read data
 # get labels from dataset and drop them if available
