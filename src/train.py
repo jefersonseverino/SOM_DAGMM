@@ -140,7 +140,7 @@ for epoch in range(epochs):
             val_L_loss = compression.reconstruction_loss(val_input)
             val_G_loss = mix.gmm_loss(out=val_out, L1=0.1, L2=0.005)
             val_total_loss = val_L_loss + val_G_loss
-            val_loss += val_total_loss.item() if loss != float('inf') else 0
+            val_loss += val_total_loss.item() if val_total_loss != float('inf') else 0
     print(f"Validation - Epoch {epoch+1} - Loss: {val_loss:.4f}")
 
     if val_loss < best_val_loss - OFFSET:
