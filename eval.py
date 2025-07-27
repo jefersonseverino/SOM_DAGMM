@@ -30,31 +30,34 @@ def parse_args():
     parser.add_argument('--embedding', dest='embed', help='one_hot, label', default='NULL', type=str)
     parser.add_argument('--features', dest='features', help='all, numerical, categorical', default='all', type=str)
     parser.add_argument('--threshold', dest='threshold', help='32', default = 20, type=int)
+    parser.add_argument('--contamination', dest='contamination', help='0.1', default=0.0, type=float)
     args = parser.parse_args()
     return args
 
 args = parse_args()
-save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + ".pt")
+save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + "_" + str(args.contamination) + ".pt")
 batch_size = 1024
 #read data
 # get labels from dataset and drop them if available
 names = [i for i in range(0,43)]
 data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
 categorical_cols = [1,2,3,4]
-data_benign = data[data[41] == "normal"]
-data_malicious = data[data[41] != "normal"]
-Y_benign, data_benign = get_labels(data_benign, args.dataset)
-Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
  
 #encode categorical variables 
 if args.embed == 'one_hot':
-    # data = one_hot_encoding(data, categorical_cols)
-    data_benign = one_hot_encoding(data_benign, categorical_cols)
-    data_malicious = one_hot_encoding(data_malicious, categorical_cols)
+    data = one_hot_encoding(data, categorical_cols)
+    # data_benign = one_hot_encoding(data_benign, categorical_cols)
+    # data_malicious = one_hot_encoding(data_malicious, categorical_cols)
 if args.embed == 'label_encode':
-    # data = label_encoding(data, categorical_cols)
-    data_benign = label_encoding(data_benign, categorical_cols)
-    data_malicious = label_encoding(data_malicious, categorical_cols)
+    data = label_encoding(data, categorical_cols)
+    # data_benign = label_encoding(data_benign, categorical_cols)
+    # data_malicious = label_encoding(data_malicious, categorical_cols)
+
+data_benign = data[data[41] == "normal"].copy()
+data_malicious = data[data[41] != "normal"].copy()
+Y_benign, data_benign = get_labels(data_benign, args.dataset)
+Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
+
 
 # Remove columns with NA values
 # data = fill_na(data)
@@ -82,6 +85,32 @@ test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
 # Concatenate Y
 Y_val = np.concatenate((Y_val, Y_val_mal), axis=0)
 Y_test = np.concatenate((Y_test, Y_test_mal), axis=0)
+
+if args.contamination > 0:
+    train_data = train_data.reset_index(drop=True)
+    val_data = val_data.reset_index(drop=True)
+    
+    malicious_index = np.where(Y_val == 1)[0]
+    benign_index = np.where(Y_train == 0)[0]
+    n_samples = int(len(train_data) * args.contamination)
+    selected_malicious_index = np.random.choice(malicious_index, n_samples, replace=False)
+    selected_benign_index = np.random.choice(benign_index, n_samples, replace=False)
+    
+    benign_data = train_data.iloc[selected_benign_index]
+    malicious_data = val_data.iloc[selected_malicious_index]
+
+    train_data = train_data.drop(index=selected_benign_index).reset_index(drop=True)
+    val_data = val_data.drop(index=selected_malicious_index).reset_index(drop=True)
+    
+    Y_train = np.delete(Y_train, selected_benign_index)
+    Y_val = np.delete(Y_val, selected_malicious_index)
+
+    train_data = pd.concat([train_data, malicious_data], ignore_index=True)
+    Y_train = np.concatenate([Y_train, np.ones(len(malicious_data))])
+
+    val_data = pd.concat([val_data, benign_data], ignore_index=True)
+    Y_val = np.concatenate([Y_val, np.zeros(len(benign_data))])
+    
 
 #Convert to torch tensors
 train_data = torch.tensor(train_data.values.astype(np.float32))

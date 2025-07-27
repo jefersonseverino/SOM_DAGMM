@@ -62,6 +62,7 @@ def get_confusion_matrix(y_pred, y):
     return tn, fp, fn, tp
 
 def normalize_cols(data):
+    data.columns = data.columns.astype(str) 
     sc = MinMaxScaler (feature_range = (0,1))
     data = sc.fit_transform(data)
     data = pd.DataFrame(data)  
