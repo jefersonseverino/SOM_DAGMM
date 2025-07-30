@@ -22,6 +22,10 @@ from SOM import som_train, som_pred
 
 from sklearn.model_selection import train_test_split
 
+SEED = 10
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+
 #read_inputs
 def parse_args():
     
@@ -41,7 +45,7 @@ batch_size = 1024
 # get labels from dataset and drop them if available
 names = [i for i in range(0,43)]
 data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-categorical_cols = [1,2,3,4]
+categorical_cols = [1,2,3]
  
 #encode categorical variables 
 if args.embed == 'one_hot':

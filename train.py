@@ -22,6 +22,9 @@ from SOM import som_train, som_pred
 from sklearn.model_selection import train_test_split
 import tqdm, copy
 
+SEED = 10
+np.random.seed(SEED)
+torch.manual_seed(SEED)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Anomaly Detection with unsupervised methods')
@@ -41,7 +44,7 @@ save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed +
 
 names = [i for i in range(0,43)]
 data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-categorical_cols = [1,2,3,4]
+categorical_cols = [1,2,3]
  
 #encode categorical variables 
 if args.embed == 'one_hot':
@@ -136,7 +139,7 @@ dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
 # Use pretrained SOM
-som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
+som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.7, iters=10000)
 
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)
