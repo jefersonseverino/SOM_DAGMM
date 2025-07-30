@@ -21,8 +21,10 @@ from som_dagmm.gmm import GMM, Mixture
 from SOM import som_train, som_pred
 from sklearn.model_selection import train_test_split
 import tqdm, copy
+import random
 
 SEED = 10
+random.seed(SEED)
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 
@@ -49,12 +51,8 @@ categorical_cols = [1,2,3]
 #encode categorical variables 
 if args.embed == 'one_hot':
     data = one_hot_encoding(data, categorical_cols)
-    # data_benign = one_hot_encoding(data_benign, categorical_cols)
-    # data_malicious = one_hot_encoding(data_malicious, categorical_cols)
 if args.embed == 'label_encode':
     data = label_encoding(data, categorical_cols)
-    # data_benign = label_encoding(data_benign, categorical_cols)
-    # data_malicious = label_encoding(data_malicious, categorical_cols)
 
 data_benign = data[data[41] == "normal"].copy()
 data_malicious = data[data[41] != "normal"].copy()
@@ -62,24 +60,17 @@ Y_benign, data_benign = get_labels(data_benign, args.dataset)
 Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
 
 # Remove columns with NA values
-# data = fill_na(data)
 data_benign = fill_na(data_benign)
 data_malicious = fill_na(data_malicious)
 
 # normalize data
-# data = normalize_cols(data)
 data_benign = normalize_cols(data_benign)
 data_malicious = normalize_cols(data_malicious)
 
 #test and train split
-# train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
-train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5)
-# Split again for validation and test
-val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5)
-
-# Split malicious data only for validation and test
-val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5)
-# Concatenate benign and malicious data for validation and test
+train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5, random_state=SEED)
+val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=SEED)
+val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=SEED)
 
 val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
 test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
