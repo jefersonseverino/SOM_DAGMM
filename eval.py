@@ -30,7 +30,7 @@ torch.manual_seed(SEED)
 def parse_args():
     
     parser = argparse.ArgumentParser(description='Anomaly Detection with unsupervised methods')
-    parser.add_argument('--dataset', dest='dataset', help='training dataset', default='vehicle_claims', type=str)
+    parser.add_argument('--dataset', dest='dataset', help='training dataset', default='kdd', type=str)
     parser.add_argument('--embedding', dest='embed', help='one_hot, label', default='NULL', type=str)
     parser.add_argument('--features', dest='features', help='all, numerical, categorical', default='all', type=str)
     parser.add_argument('--threshold', dest='threshold', help='32', default = 20, type=int)
@@ -43,22 +43,33 @@ save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed +
 batch_size = 1024
 #read data
 # get labels from dataset and drop them if available
-names = [i for i in range(0,43)]
-data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-categorical_cols = [1,2,3]
- 
-#encode categorical variables 
-if args.embed == 'one_hot':
-    data = one_hot_encoding(data, categorical_cols)
-    # data_benign = one_hot_encoding(data_benign, categorical_cols)
-    # data_malicious = one_hot_encoding(data_malicious, categorical_cols)
-if args.embed == 'label_encode':
-    data = label_encoding(data, categorical_cols)
-    # data_benign = label_encoding(data_benign, categorical_cols)
-    # data_malicious = label_encoding(data_malicious, categorical_cols)
+if args.dataset == 'credit_card':
+    data = load_data('data/CreditCardFraud/creditcard.csv')
+    Y = get_labels(data, args.dataset)
 
-data_benign = data[data[41] == "normal"].copy()
-data_malicious = data[data[41] != "normal"].copy()
+    data_benign = data[data['Class'] == 0].copy()
+    data_malicious = data[data['Class'] == 1].copy()
+
+elif args.dataset == 'arrhythmia':
+    data = load_data('data/arrhythmia.csv')
+    data = remove_cols(data, ['J'])
+    Y = get_labels(data, args.dataset)
+
+elif args.dataset == 'kdd':
+    names = [i for i in range(0,43)]
+    data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
+    categorical_cols = [1,2,3]
+    Y = get_labels(data, args.dataset)
+
+    #encode categorical variables 
+    if args.embed == 'one_hot':
+        data = one_hot_encoding(data, categorical_cols)
+    elif args.embed == 'label_encode':
+        data = label_encoding(data, categorical_cols)
+ 
+    data_benign = data[data[41] == "normal"].copy()
+    data_malicious = data[data[41] != "normal"].copy()
+
 Y_benign, data_benign = get_labels(data_benign, args.dataset)
 Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
 
