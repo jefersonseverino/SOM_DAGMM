@@ -84,6 +84,10 @@ data_malicious = fill_na(data_malicious)
 data_benign = normalize_cols(data_benign)
 data_malicious = normalize_cols(data_malicious)
 
+if args.dataset == 'kdd':
+    data_benign = data_benign.drop(data_benign.columns[-1], axis=1)
+    data_malicious = data_malicious.drop(data_malicious.columns[-1], axis=1)
+
 #test and train split
 # train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
 train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.4)
