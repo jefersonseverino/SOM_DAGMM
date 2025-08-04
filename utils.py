@@ -46,6 +46,10 @@ def get_labels(data, name):
     elif name == 'kdd':
         label = np.where(data[41] == "normal", 0, 1)
         data = data.drop([41], axis=1)
+    elif name == 'cic':
+        label = data['Label']
+        label = np.where(data['Label'] == 'BENIGN', 0, 1)
+        data = data.drop(['Label'], axis=1)
     return label, data
 
 def get_scores(y_pred, y):
@@ -63,6 +67,8 @@ def get_confusion_matrix(y_pred, y):
 
 def normalize_cols(data):
     data.columns = data.columns.astype(str) 
+    # data = data.replace([np.inf, -np.inf], np.nan)
+    # data = fill_na(data.replace([np.inf, -np.inf], np.nan))
     sc = MinMaxScaler (feature_range = (0,1))
     data = sc.fit_transform(data)
     data = pd.DataFrame(data)  

@@ -67,7 +67,16 @@ elif args.dataset == 'kdd':
 
     data_benign = data[data[41] == "normal"].copy()
     data_malicious = data[data[41] != "normal"].copy()
- 
+
+elif args.dataset == 'cic':
+    data = load_data('data/data.csv')
+    data = data.sample(n=500000, random_state=SEED)
+        
+    categorical_cols = ['Timestamp']
+    data = remove_cols(data, categorical_cols)
+    data_benign = data[data['Label'] == 'Benign'].copy()
+    data_malicious = data[data['Label'] != 'Benign'].copy()
+
 Y_benign, data_benign = get_labels(data_benign, args.dataset)
 Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
 
@@ -79,6 +88,7 @@ data_malicious = fill_na(data_malicious)
 data_benign = normalize_cols(data_benign)
 data_malicious = normalize_cols(data_malicious)
 
+# Drop last column if dataset is KDD
 if args.dataset == 'kdd':
     data_benign = data_benign.drop(data_benign.columns[-1], axis=1)
     data_malicious = data_malicious.drop(data_malicious.columns[-1], axis=1)
@@ -149,7 +159,7 @@ dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
 # Use pretrained SOM
-som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.7, iters=10000)
+som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
 
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)

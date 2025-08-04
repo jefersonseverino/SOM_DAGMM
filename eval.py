@@ -70,6 +70,15 @@ elif args.dataset == 'kdd':
     data_benign = data[data[41] == "normal"].copy()
     data_malicious = data[data[41] != "normal"].copy()
 
+elif args.dataset == 'cic':
+    data = load_data('data/data.csv')
+    data = data.sample(n=500000, random_state=SEED)
+        
+    categorical_cols = ['Timestamp']
+    data = remove_cols(data, categorical_cols)
+    data_benign = data[data['Label'] == 'Benign'].copy()
+    data_malicious = data[data['Label'] != 'Benign'].copy()
+
 Y_benign, data_benign = get_labels(data_benign, args.dataset)
 Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
 
@@ -89,13 +98,12 @@ if args.dataset == 'kdd':
     data_malicious = data_malicious.drop(data_malicious.columns[-1], axis=1)
 
 #test and train split
-# train_data, test_data, Y_train, Y_test = train_test_split(data, Y, test_size=0.2)
-train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.4)
+train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5, random_state=SEED)
 # Split again for validation and test
-val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5)
+val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=SEED)
 
 # Split malicious data only for validation and test
-val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5)
+val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=SEED)
 
 # Concatenate benign and malicious data for validation and test
 val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
