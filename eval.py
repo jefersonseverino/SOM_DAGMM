@@ -22,9 +22,7 @@ from SOM import som_train, som_pred
 
 from sklearn.model_selection import train_test_split
 
-SEED = 10
-np.random.seed(SEED)
-torch.manual_seed(SEED)
+SEED = 42
 
 #read_inputs
 def parse_args():

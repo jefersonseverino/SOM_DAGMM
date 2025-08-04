@@ -23,10 +23,7 @@ from sklearn.model_selection import train_test_split
 import tqdm, copy
 import random
 
-SEED = 10
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
+SEED = 42
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Anomaly Detection with unsupervised methods')
@@ -166,47 +163,58 @@ optimizer =  optim.Adam(net.parameters(), lr=1e-4)
 
 OFFSET = 0.2
 MAX_ATTEMPT = 5
-best_val_loss = 100
+best_val_score = 0.0
 count_since_better_loss = 0
 
+os.makedirs("checkpoints", exist_ok=True)
+model_path = os.path.join("checkpoints", f"{args.dataset}_{args.features}_{args.embed}_{args.contamination}_best.pt")
+
+best_val_score = 0.0
+
 for epoch in range(epochs):
-    print('EPOCH {}:'.format(epoch + 1))
-    running_loss = 0
-    for i, data in enumerate(tqdm.tqdm(train_dataloader, desc=f"Epoch {epoch + 1}")):
-        out = net(data[0])
-        optimizer.zero_grad()
-        L_loss = compression.reconstruction_loss(data[0])
-        G_loss = mix.gmm_loss(out=out, L1=0.1, L2=0.005)
-        loss = L_loss + G_loss
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item()
-    net.eval()
-    val_loss = 0
-    with torch.no_grad():
-        for val_batch in val_dataloader:
-            val_input = val_batch[0]
-            val_out = net(val_input)
-            val_L_loss = compression.reconstruction_loss(val_input)
-            val_G_loss = mix.gmm_loss(out=val_out, L1=0.1, L2=0.005)
-            val_total_loss = val_L_loss + val_G_loss
-            val_loss += val_total_loss.item() if torch.isfinite(val_total_loss) else 0
-    print(f"Validation - Epoch {epoch+1} - Loss: {val_loss:.4f}")
-
-    if val_loss < best_val_loss - OFFSET:
-        print(f"New best validation loss: {val_loss:.4f}")
-        best_val_loss = val_loss
-        count_since_better_loss = 0
-        best_net = copy.deepcopy(net.state_dict())
-    else:
-        count_since_better_loss += 1
-        print(f"    Sem melhoras. Tentativa: {count_since_better_loss} de {MAX_ATTEMPT}")
-        if count_since_better_loss >= MAX_ATTEMPT:
-            print(f"Convergência após {epoch} iterações.")
-            break
-    
     net.train()
+    running_loss = 0.0
+    error_count = 0
 
-net.load_state_dict(best_net)
-net.train()
+    for batch in train_dataloader:
+        data = batch[0]
+        optimizer.zero_grad()
+
+        # Forward pass
+        out = net(data)
+
+        # Reconstruction loss
+        L_loss = compression.reconstruction_loss(data)
+
+        # GMM likelihood loss
+        G_loss = mix.gmm_loss(out=out, L1=0.1, L2=0.005)
+
+        loss = L_loss + G_loss
+
+        if torch.isfinite(loss):
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        else:
+            error_count += 1
+
+    print(f"Epoch {epoch+1}: Loss={running_loss:.4f}, Errors={error_count}")
+
+    if (epoch + 1) % 5 == 0:
+        net.eval()
+        with torch.no_grad():
+            out_val = net(val_data)
+
+        threshold = np.percentile(out_val.cpu().numpy(), 20)
+        pred_val = (out_val.cpu().numpy() > threshold).astype(int)
+
+        acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
+        print(f"Validation - Acc: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1: {f1:.4f}")
+
+        if f1 > best_val_score:
+            best_val_score = f1
+            torch.save(net, model_path)
+            print(f"✅ New best model saved to {model_path} with F1={f1:.4f}")
+
+
 torch.save(net, save_path)
