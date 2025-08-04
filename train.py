@@ -98,20 +98,23 @@ Y_test = np.concatenate([Y_test, Y_test_mal])
 if args.contamination > 0:
     train_data = train_data.reset_index(drop=True)
     val_data = val_data.reset_index(drop=True)
-    
-    malicious_index = np.where(Y_val == 1)[0]
+    Y_train = Y_train.flatten()
+    Y_val = Y_val.flatten()
+
     benign_index = np.where(Y_train == 0)[0]
+    malicious_index = np.where(Y_val == 1)[0]
     n_samples = int(len(train_data) * args.contamination)
-    selected_malicious_index = np.random.choice(malicious_index, n_samples, replace=False)
+
     selected_benign_index = np.random.choice(benign_index, n_samples, replace=False)
-    
+    selected_malicious_index = np.random.choice(malicious_index, n_samples, replace=False)
+
     benign_data = train_data.iloc[selected_benign_index]
     malicious_data = val_data.iloc[selected_malicious_index]
 
     train_data = train_data.drop(index=selected_benign_index).reset_index(drop=True)
-    val_data = val_data.drop(index=selected_malicious_index).reset_index(drop=True)
-    
     Y_train = np.delete(Y_train, selected_benign_index)
+
+    val_data = val_data.drop(index=selected_malicious_index).reset_index(drop=True)
     Y_val = np.delete(Y_val, selected_malicious_index)
 
     train_data = pd.concat([train_data, malicious_data], ignore_index=True)
