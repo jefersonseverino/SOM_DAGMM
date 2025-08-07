@@ -12,7 +12,7 @@ from sklearn import metrics
 
 def load_data(file_path, names = None):
     names = names
-    data = pd.read_csv(file_path, names = names)
+    data = pd.read_csv(file_path, names = names, na_values='?')
     return data
 
 def one_hot_encoding(data, cols):
@@ -40,9 +40,9 @@ def get_labels(data, name):
         label = data['Class']
         data = data.drop(['Class'], axis=1)
     elif name == 'arrhythmia':
-        label = data['class']
+        label = data[280]
         label = np.where(label.isin([3, 4, 5, 7, 8, 9, 14, 15]), 0, 1)
-        data = data.drop(['class'], axis=1)
+        data = data.drop([280], axis=1)
     elif name == 'kdd':
         label = np.where(data[41] == "normal", 0, 1)
         data = data.drop([41], axis=1)

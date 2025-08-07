@@ -48,9 +48,13 @@ if args.dataset == 'credit_card':
     data_benign = data[data['Class'] == 0].copy()
     data_malicious = data[data['Class'] == 1].copy()
 elif args.dataset == 'arrhythmia':
-    data = load_data('data/arrhythmia.csv')
-    data = remove_cols(data, ['J'])
+    names = [i for i in range(1,281)]
+    data = load_data('data/arrhythmia.csv', names)
+    data = remove_cols(data, 14)
     Y = get_labels(data, args.dataset)
+
+    data_benign = data[data[280] == 1].copy()
+    data_malicious = data[data[280] != 1].copy()
 elif args.dataset == 'kdd':
     names = [i for i in range(0,43)]
     data = load_data('data/NSL-KDD/KDDTrain+.txt', names)

@@ -49,9 +49,13 @@ if args.dataset == 'credit_card':
     data_malicious = data[data['Class'] == 1].copy()
 
 elif args.dataset == 'arrhythmia':
-    data = load_data('data/arrhythmia.csv')
-    data = remove_cols(data, ['J'])
+    names = [i for i in range(1,281)]
+    data = load_data('data/arrhythmia.csv', names)
+    data = remove_cols(data, 14)
     Y = get_labels(data, args.dataset)
+
+    data_benign = data[data[280] == 1].copy()
+    data_malicious = data[data[280] != 1].copy()
 
 elif args.dataset == 'kdd':
     names = [i for i in range(0,43)]
@@ -118,8 +122,13 @@ if args.contamination > 0:
     train_data = train_data.reset_index(drop=True)
     val_data = val_data.reset_index(drop=True)
     
-    malicious_index = np.where(Y_val == 1)[0]
-    benign_index = np.where(Y_train == 0)[0]
+    if args.dataset == 'kdd':
+        malicious_index = np.where(Y_val == 1)[0]
+        benign_index = np.where(Y_train == 0)[0]
+    elif args.dataset == 'arrhythmia':
+        malicious_index = np.where(Y_val != 1)[0]
+        benign_index = np.where(Y_train == 1)[0]
+
     n_samples = int(len(train_data) * args.contamination)
     selected_malicious_index = np.random.choice(malicious_index, n_samples, replace=False)
     selected_benign_index = np.random.choice(benign_index, n_samples, replace=False)
