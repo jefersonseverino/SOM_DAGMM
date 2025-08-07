@@ -37,7 +37,7 @@ def parse_args():
     return args
 
 args = parse_args()
-save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed + "_" + str(args.contamination) + ".pt")
+save_path = os.path.join("checkpoints", args.dataset + "_" + args.features + "_" + args.embed + "_" + str(args.contamination) + "_best" + ".pt")
 batch_size = 1024
 #read data
 # get labels from dataset and drop them if available
@@ -69,11 +69,14 @@ elif args.dataset == 'kdd':
     data_malicious = data[data[41] != "normal"].copy()
 
 elif args.dataset == 'cic':
-    data = load_data('data/data.csv')
+    data = pd.DataFrame()
+    for file in os.listdir('data/CIC-2018/CSE-CIC-IDS2018/'):
+        if file.endswith('.csv'):
+            file_path = os.path.join('data/CIC-2018/CSE-CIC-IDS2018/', file)
+            df = pd.read_csv(file_path)
+            data = pd.concat([data, df], ignore_index=True)
+    # Get a sample of 500k rows
     data = data.sample(n=500000, random_state=SEED)
-        
-    categorical_cols = ['Timestamp']
-    data = remove_cols(data, categorical_cols)
     data_benign = data[data['Label'] == 'Benign'].copy()
     data_malicious = data[data['Label'] != 'Benign'].copy()
 
@@ -155,7 +158,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 net = torch.load(save_path, weights_only=False)
 net.eval()
 out = net(test_data)
-threshold = np.percentile(out, 20)
+threshold = np.percentile(out, args.threshold)
 pred = (out > threshold).numpy().astype(int)
 
 # Precision, Recall, F1

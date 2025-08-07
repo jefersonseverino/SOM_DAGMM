@@ -66,11 +66,14 @@ elif args.dataset == 'kdd':
     data_malicious = data[data[41] != "normal"].copy()
 
 elif args.dataset == 'cic':
-    data = load_data('data/data.csv')
+    data = pd.DataFrame()
+    for file in os.listdir('data/CIC-2018/CSE-CIC-IDS2018/'):
+        if file.endswith('.csv'):
+            file_path = os.path.join('data/CIC-2018/CSE-CIC-IDS2018/', file)
+            df = pd.read_csv(file_path)
+            data = pd.concat([data, df], ignore_index=True)
     data = data.sample(n=500000, random_state=SEED)
-        
-    categorical_cols = ['Timestamp']
-    data = remove_cols(data, categorical_cols)
+    
     data_benign = data[data['Label'] == 'Benign'].copy()
     data_malicious = data[data['Label'] != 'Benign'].copy()
 
@@ -102,6 +105,7 @@ test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
 Y_val = np.concatenate([Y_val, Y_val_mal])
 Y_test = np.concatenate([Y_test, Y_test_mal])
 
+
 if args.contamination > 0:
     train_data = train_data.reset_index(drop=True)
     val_data = val_data.reset_index(drop=True)
@@ -130,6 +134,7 @@ if args.contamination > 0:
     val_data = pd.concat([val_data, benign_data], ignore_index=True)
     Y_val = np.concatenate([Y_val, np.zeros(len(benign_data))])
 
+
 #train_data = train_data.values.astype(np.float32)
 print(train_data.shape)
 
@@ -156,7 +161,7 @@ dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
 # Use pretrained SOM
-som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.8, iters=10000)
+som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.6, iters=10000)
 
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=1e-4)
@@ -180,10 +185,8 @@ for epoch in range(epochs):
         data = batch[0]
         optimizer.zero_grad()
 
-        # Forward pass
         out = net(data)
 
-        # Reconstruction loss
         L_loss = compression.reconstruction_loss(data)
 
         # GMM likelihood loss
@@ -205,7 +208,11 @@ for epoch in range(epochs):
         with torch.no_grad():
             out_val = net(val_data)
 
-        threshold = np.percentile(out_val.cpu().numpy(), 20)
+        if args.dataset == 'cic':
+            threshold = np.percentile(out_val.cpu().numpy(), 45)
+        elif args.dataset == 'kdd':
+            threshold = np.percentile(out_val.cpu().numpy(), 20)
+
         pred_val = (out_val.cpu().numpy() > threshold).astype(int)
 
         acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
@@ -214,7 +221,4 @@ for epoch in range(epochs):
         if f1 > best_val_score:
             best_val_score = f1
             torch.save(net, model_path)
-            print(f"✅ New best model saved to {model_path} with F1={f1:.4f}")
-
-
-torch.save(net, save_path)
+            print(f"New best model saved to {model_path} with F1={f1:.4f}")

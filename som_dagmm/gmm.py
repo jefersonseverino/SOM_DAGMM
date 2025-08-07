@@ -85,7 +85,7 @@ class Mixture(nn.Module):
         #       new variables and conversions from numpy?
         batch_size, _ = samples.shape
         out_values = []
-        inv_sigma = torch.inverse(self.Sigma)
+        inv_sigma = torch.pinverse(self.Sigma)
         det_sigma = np.linalg.det(self.Sigma.data.cpu().numpy())
         det_sigma = torch.from_numpy(det_sigma.reshape([1])).float()
         det_sigma = torch.autograd.Variable(det_sigma)

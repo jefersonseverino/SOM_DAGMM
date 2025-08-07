@@ -48,7 +48,7 @@ def get_labels(data, name):
         data = data.drop([41], axis=1)
     elif name == 'cic':
         label = data['Label']
-        label = np.where(data['Label'] == 'BENIGN', 0, 1)
+        label = np.where(data['Label'] == 'Benign', 0, 1)
         data = data.drop(['Label'], axis=1)
     return label, data
 
@@ -67,8 +67,8 @@ def get_confusion_matrix(y_pred, y):
 
 def normalize_cols(data):
     data.columns = data.columns.astype(str) 
-    # data = data.replace([np.inf, -np.inf], np.nan)
-    # data = fill_na(data.replace([np.inf, -np.inf], np.nan))
+    data = data.replace([np.inf, -np.inf], np.nan)
+    data = fill_na(data)
     sc = MinMaxScaler (feature_range = (0,1))
     data = sc.fit_transform(data)
     data = pd.DataFrame(data)  
