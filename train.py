@@ -212,11 +212,13 @@ for epoch in range(epochs):
         with torch.no_grad():
             out_val = net(val_data)
 
+        threshold = 0
         if args.dataset == 'cic':
             threshold = np.percentile(out_val.cpu().numpy(), 45)
         elif args.dataset == 'kdd':
             threshold = np.percentile(out_val.cpu().numpy(), 20)
-
+        else:
+            threshold = 20
         pred_val = (out_val.cpu().numpy() > threshold).astype(int)
 
         acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
