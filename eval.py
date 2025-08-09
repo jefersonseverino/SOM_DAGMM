@@ -33,6 +33,12 @@ def parse_args():
     parser.add_argument('--features', dest='features', help='all, numerical, categorical', default='all', type=str)
     parser.add_argument('--threshold', dest='threshold', help='32', default = 20, type=int)
     parser.add_argument('--contamination', dest='contamination', help='0.1', default=0.0, type=float)
+    parser.add_argument('--seed', dest='seed', help='42', default=42, type=int)
+    parser.add_argument('--lrsom', dest='lrsom', help='0.4', default=0.4, type=float)
+    parser.add_argument('--nf', dest='nf', help='bubble', default='bubble', type=str)
+    parser.add_argument('--lrdagmm', dest='lrdagmm', help='0.0001', default=0.0001, type=float)
+    parser.add_argument('--l1', dest='l1', help='0.1', default=0.1, type=float)
+    parser.add_argument('--l2', dest='l2', help='0.005', default=0.005, type=float)
     args = parser.parse_args()
     return args
 
@@ -80,7 +86,7 @@ elif args.dataset == 'cic':
             df = pd.read_csv(file_path)
             data = pd.concat([data, df], ignore_index=True)
     # Get a sample of 500k rows
-    data = data.sample(n=500000, random_state=SEED)
+    data = data.sample(n=500000, random_state=args.seed)
     data_benign = data[data['Label'] == 'Benign'].copy()
     data_malicious = data[data['Label'] != 'Benign'].copy()
 
@@ -95,20 +101,20 @@ data_malicious = fill_na(data_malicious)
 
 # normalize data
 # data = normalize_cols(data)
-data_benign = normalize_cols(data_benign)
-data_malicious = normalize_cols(data_malicious)
+#data_benign = normalize_cols(data_benign)
+#data_malicious = normalize_cols(data_malicious)
 
 if args.dataset == 'kdd':
     data_benign = data_benign.drop(data_benign.columns[-1], axis=1)
     data_malicious = data_malicious.drop(data_malicious.columns[-1], axis=1)
 
 #test and train split
-train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5, random_state=SEED)
+train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5, random_state=args.seed)
 # Split again for validation and test
-val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=SEED)
+val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=args.seed)
 
 # Split malicious data only for validation and test
-val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=SEED)
+val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=args.seed)
 
 # Concatenate benign and malicious data for validation and test
 val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
@@ -148,6 +154,9 @@ if args.contamination > 0:
     val_data = pd.concat([val_data, benign_data], ignore_index=True)
     Y_val = np.concatenate([Y_val, np.zeros(len(benign_data))])
     
+train_data, train_scaler = normalize_cols(train_data)
+val_data, scaler = normalize_cols(val_data, train_scaler)
+test_data, scaler = normalize_cols(test_data, train_scaler)
 
 #Convert to torch tensors
 train_data = torch.tensor(train_data.values.astype(np.float32))
@@ -173,3 +182,7 @@ pred = (out > threshold).numpy().astype(int)
 # Precision, Recall, F1
 acc, p, r, f, a = get_scores(pred, Y_test)
 print("Accuracy:", acc, "Precision:", p, "Recall:", r, "F1 Score:", f, "AUROC:", a)
+
+# SAve contamination and metrics in txt file
+with open('contamination.txt', 'a') as file:
+    file.write(f"Contamination: {args.contamination}, nf={args.nf} lrsom={args.lrsom}, lrdagmm={args.lrdagmm}, l1={args.l1}, l2={args.l2} Accuracy: {acc}, Precision: {p}, Recall: {r}, F1 Score: {f}, AUROC: {a}\n")

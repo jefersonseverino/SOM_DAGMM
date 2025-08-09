@@ -65,14 +65,17 @@ def get_confusion_matrix(y_pred, y):
     tn, fp, fn, tp = confusion_matrix(y_pred, y).ravel()
     return tn, fp, fn, tp
 
-def normalize_cols(data):
+def normalize_cols(data, sc=None):
     data.columns = data.columns.astype(str) 
     data = data.replace([np.inf, -np.inf], np.nan)
     data = fill_na(data)
-    sc = MinMaxScaler (feature_range = (0,1))
-    data = sc.fit_transform(data)
+    if sc is None:
+        sc = MinMaxScaler(feature_range=(0, 1))
+        data = sc.fit_transform(data)
+    else:
+        data = sc.transform(data)
     data = pd.DataFrame(data)  
-    return data  
+    return data, sc  
 
 def merge_cols(data_1, data_2):
     data = pd.concat([data_1, data_2], axis=1)

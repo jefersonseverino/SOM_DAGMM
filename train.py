@@ -33,6 +33,12 @@ def parse_args():
     parser.add_argument('--batch_size', dest='batch_size', help='32', default = 32, type=int)
     parser.add_argument('--epoch', dest='epoch', help='1', default='1', type=int)
     parser.add_argument('--contamination', dest='contamination', help='0.1', default=0.0, type=float)
+    parser.add_argument('--seed', dest='seed', help='42', default=42, type=int)
+    parser.add_argument('--lrsom', dest='lrsom', help='0.4', default=0.4, type=float)
+    parser.add_argument('--nf', dest='nf', help='bubble', default='bubble', type=str)
+    parser.add_argument('--lrdagmm', dest='lrdagmm', help='0.0001', default=0.0001, type=float)
+    parser.add_argument('--l1', dest='l1', help='0.1', default=0.1, type=float)
+    parser.add_argument('--l2', dest='l2', help='0.005', default=0.005, type=float)
     args = parser.parse_args()
     return args
 
@@ -76,8 +82,8 @@ elif args.dataset == 'cic':
             file_path = os.path.join('data/CIC-2018/CSE-CIC-IDS2018/', file)
             df = pd.read_csv(file_path)
             data = pd.concat([data, df], ignore_index=True)
-    data = data.sample(n=500000, random_state=SEED)
-    
+    data = data.sample(n=500000, random_state=args.seed)
+        
     data_benign = data[data['Label'] == 'Benign'].copy()
     data_malicious = data[data['Label'] != 'Benign'].copy()
 
@@ -89,8 +95,8 @@ data_benign = fill_na(data_benign)
 data_malicious = fill_na(data_malicious)
 
 # normalize data
-data_benign = normalize_cols(data_benign)
-data_malicious = normalize_cols(data_malicious)
+#data_benign = normalize_cols(data_benign)
+#data_malicious = normalize_cols(data_malicious)
 
 # Drop last column if dataset is KDD
 if args.dataset == 'kdd':
@@ -98,9 +104,9 @@ if args.dataset == 'kdd':
     data_malicious = data_malicious.drop(data_malicious.columns[-1], axis=1)
 
 #test and train split
-train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5, random_state=SEED)
-val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=SEED)
-val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=SEED)
+train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, test_size=0.5, random_state=args.seed)
+val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=args.seed)
+val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=args.seed)
 
 val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
 test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
@@ -142,6 +148,10 @@ if args.contamination > 0:
 #train_data = train_data.values.astype(np.float32)
 print(train_data.shape)
 
+train_data, train_scaler = normalize_cols(train_data)
+val_data, scaler = normalize_cols(val_data, train_scaler)
+test_data, scaler = normalize_cols(test_data, train_scaler)
+
 #Convert to torch tensors
 train_data = torch.tensor(train_data.values.astype(np.float32))
 val_data = torch.tensor(val_data.values.astype(np.float32))
@@ -165,10 +175,10 @@ dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
 # Use pretrained SOM
-som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=0.6, iters=10000)
+som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=args.lrsom, iters=10000, neighborhood_function=args.nf)
 
 net = SOM_DAGMM(som, dagmm)
-optimizer =  optim.Adam(net.parameters(), lr=1e-4)
+optimizer =  optim.Adam(net.parameters(), lr=args.lrdagmm)
 
 OFFSET = 0.2
 MAX_ATTEMPT = 5
@@ -194,7 +204,7 @@ for epoch in range(epochs):
         L_loss = compression.reconstruction_loss(data)
 
         # GMM likelihood loss
-        G_loss = mix.gmm_loss(out=out, L1=0.1, L2=0.005)
+        G_loss = mix.gmm_loss(out=out, L1=args.l1, L2=args.l2)
 
         loss = L_loss + G_loss
 
@@ -216,9 +226,10 @@ for epoch in range(epochs):
         if args.dataset == 'cic':
             threshold = np.percentile(out_val.cpu().numpy(), 45)
         elif args.dataset == 'kdd':
-            threshold = np.percentile(out_val.cpu().numpy(), 20)
+            threshold = np.percentile(out_val.cpu().numpy(), 25)
         else:
             threshold = 20
+        
         pred_val = (out_val.cpu().numpy() > threshold).astype(int)
 
         acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
