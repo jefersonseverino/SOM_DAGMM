@@ -1,6 +1,4 @@
 import pandas as pd
-import os
-import sys
 import numpy as np
 import torch
 from sklearn import preprocessing
@@ -24,7 +22,6 @@ def one_hot_encoding(data, cols):
     data.drop(cols, axis=1, inplace=True)
     data = pd.concat([data, encoded_data], axis=1)
     return data
-
 
 def label_encoding(data, cols):
     data_copy = data.copy()

@@ -5,6 +5,7 @@ from torch import nn
 
 eps = torch.autograd.Variable(torch.FloatTensor([1.e-8]), requires_grad=False)
 
+# Class to represent the SOM-DAGMM model
 class SOM_DAGMM(nn.Module):
     def __init__(self, som, dagmm):
         super().__init__()
@@ -16,7 +17,7 @@ class SOM_DAGMM(nn.Module):
         winners = torch.tensor([normalize_tuple(winners[i], 10) for i in range(len(winners))], dtype=torch.float32)
         return self.dagmm(input, winners)
        
-        
+# Class to represent the DAGMM model
 class DAGMM(nn.Module):
     def __init__(self, compression_module, estimation_module, gmm_module):
         """
@@ -67,7 +68,6 @@ def relative_euclidean_distance(x1, x2, eps=eps):
     num = torch.norm(x1 - x2, p=2, dim=1)  # dim [batch_size]
     denom = torch.norm(x1, p=2, dim=1)  # dim [batch_size]
     return num / torch.max(denom, eps)
-
 
 def cosine_similarity(x1, x2, eps=eps):
     """x1 and x2 are assumed to be Variables or Tensors.

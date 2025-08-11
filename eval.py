@@ -26,7 +26,6 @@ SEED = 42
 
 #read_inputs
 def parse_args():
-    
     parser = argparse.ArgumentParser(description='Anomaly Detection with unsupervised methods')
     parser.add_argument('--dataset', dest='dataset', help='training dataset', default='kdd', type=str)
     parser.add_argument('--embedding', dest='embed', help='one_hot, label', default='NULL', type=str)
@@ -45,8 +44,8 @@ def parse_args():
 args = parse_args()
 save_path = os.path.join("checkpoints", args.dataset + "_" + args.features + "_" + args.embed + "_" + str(args.contamination) + "_best" + ".pt")
 batch_size = 1024
-#read data
-# get labels from dataset and drop them if available
+
+# Dataset loading and dividing into benign and malicious samples
 if args.dataset == 'credit_card':
     data = load_data('data/CreditCardFraud/creditcard.csv')
     Y = get_labels(data, args.dataset)
@@ -68,42 +67,31 @@ elif args.dataset == 'kdd':
     data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
     categorical_cols = [1,2,3]
     Y = get_labels(data, args.dataset)
-
     #encode categorical variables 
     if args.embed == 'one_hot':
         data = one_hot_encoding(data, categorical_cols)
     elif args.embed == 'label_encode':
         data = label_encoding(data, categorical_cols)
- 
+
+    # Divide into benign and malicious samples
     data_benign = data[data[41] == "normal"].copy()
     data_malicious = data[data[41] != "normal"].copy()
-
 elif args.dataset == 'cic':
-    data = pd.DataFrame()
-    for file in os.listdir('data/CIC-2018/CSE-CIC-IDS2018/'):
-        if file.endswith('.csv'):
-            file_path = os.path.join('data/CIC-2018/CSE-CIC-IDS2018/', file)
-            df = pd.read_csv(file_path)
-            data = pd.concat([data, df], ignore_index=True)
-    # Get a sample of 500k rows
-    data = data.sample(n=500000, random_state=args.seed)
+    # All features are numerical here
+    data = pd.read_csv('./data/cic/CSE-CIC-IDS2018-25k-instances.csv')
+    # Divide into benign and malicious samples
     data_benign = data[data['Label'] == 'Benign'].copy()
     data_malicious = data[data['Label'] != 'Benign'].copy()
 
+# Get labels and drop label columns
 Y_benign, data_benign = get_labels(data_benign, args.dataset)
 Y_malicious, data_malicious = get_labels(data_malicious, args.dataset)
 
-
 # Remove columns with NA values
-# data = fill_na(data)
 data_benign = fill_na(data_benign)
 data_malicious = fill_na(data_malicious)
 
-# normalize data
-# data = normalize_cols(data)
-#data_benign = normalize_cols(data_benign)
-#data_malicious = normalize_cols(data_malicious)
-
+# Drop the last column of kdd to match the number of columns of the original paper
 if args.dataset == 'kdd':
     data_benign = data_benign.drop(data_benign.columns[-1], axis=1)
     data_malicious = data_malicious.drop(data_malicious.columns[-1], axis=1)
@@ -124,6 +112,7 @@ test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
 Y_val = np.concatenate((Y_val, Y_val_mal), axis=0)
 Y_test = np.concatenate((Y_test, Y_test_mal), axis=0)
 
+# Introduce contamination in training set from malicious samples in validation set
 if args.contamination > 0:
     train_data = train_data.reset_index(drop=True)
     val_data = val_data.reset_index(drop=True)
@@ -135,6 +124,8 @@ if args.contamination > 0:
         malicious_index = np.where(Y_val != 1)[0]
         benign_index = np.where(Y_train == 1)[0]
 
+    # Select a random sample of malicious and benign data
+    # Transfer malicious samples to training set and benign samples to validation set
     n_samples = int(len(train_data) * args.contamination)
     selected_malicious_index = np.random.choice(malicious_index, n_samples, replace=False)
     selected_benign_index = np.random.choice(benign_index, n_samples, replace=False)
@@ -153,7 +144,8 @@ if args.contamination > 0:
 
     val_data = pd.concat([val_data, benign_data], ignore_index=True)
     Y_val = np.concatenate([Y_val, np.zeros(len(benign_data))])
-    
+
+# Normalize data using MinMaxScaler and train scaler for validation and test data
 train_data, train_scaler = normalize_cols(train_data)
 val_data, scaler = normalize_cols(val_data, train_scaler)
 test_data, scaler = normalize_cols(test_data, train_scaler)
@@ -173,16 +165,15 @@ train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
+# Load the model with the best validation f1 score
 net = torch.load(save_path, weights_only=False)
 net.eval()
 out = net(test_data)
+
+# Using the best threshold determined during training by the validation set
 threshold = np.percentile(out, args.threshold)
 pred = (out > threshold).numpy().astype(int)
 
 # Precision, Recall, F1
 acc, p, r, f, a = get_scores(pred, Y_test)
 print("Accuracy:", acc, "Precision:", p, "Recall:", r, "F1 Score:", f, "AUROC:", a)
-
-# SAve contamination and metrics in txt file
-with open('contamination.txt', 'a') as file:
-    file.write(f"Contamination: {args.contamination}, nf={args.nf} lrsom={args.lrsom}, lrdagmm={args.lrdagmm}, l1={args.l1}, l2={args.l2} Accuracy: {acc}, Precision: {p}, Recall: {r}, F1 Score: {f}, AUROC: {a}\n")
