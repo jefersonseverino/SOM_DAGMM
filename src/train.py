@@ -25,6 +25,16 @@ import random
 
 SEED = 42
 
+# Python & libs padrão
+random.seed(SEED)
+np.random.seed(SEED)
+os.environ["PYTHONHASHSEED"] = str(SEED)
+
+# Torch CPU & GPU
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)  # para multi-GPU
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Anomaly Detection with unsupervised methods')
     parser.add_argument('--dataset', dest='dataset', help='training dataset', default='kdd', type=str)
@@ -175,12 +185,13 @@ dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
 # Use pretrained SOM
-som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=args.lrsom, iters=10000, neighborhood_function=args.nf)
+som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=args.lrsom, iters=10000)
 
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=args.lrdagmm)
 
 OFFSET = 0.2
+MAX_TRYS = 5
 MAX_ATTEMPT = 5
 best_val_score = 0.0
 count_since_better_loss = 0
@@ -215,27 +226,35 @@ for epoch in range(epochs):
         else:
             error_count += 1
 
-    print(f"Epoch {epoch+1}: Loss={running_loss:.4f}, Errors={error_count}")
+    net.eval()
+    with torch.no_grad():
+        out_val = net(val_data)
 
-    if (epoch + 1) % 5 == 0:
-        net.eval()
-        with torch.no_grad():
-            out_val = net(val_data)
+    threshold = 0
+    if args.dataset == 'cic':
+        threshold = np.percentile(out_val.cpu().numpy(), 45)
+    elif args.dataset == 'kdd':
+        threshold = np.percentile(out_val.cpu().numpy(), 25)
+    else:
+        threshold = 20
+    
+    pred_val = (out_val.cpu().numpy() > threshold).astype(int)
 
-        threshold = 0
-        if args.dataset == 'cic':
-            threshold = np.percentile(out_val.cpu().numpy(), 45)
-        elif args.dataset == 'kdd':
-            threshold = np.percentile(out_val.cpu().numpy(), 25)
-        else:
-            threshold = 20
-        
-        pred_val = (out_val.cpu().numpy() > threshold).astype(int)
+    acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
 
-        acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
+    print(f"Epoch {epoch+1}: Loss={running_loss:.4f}, Errors={error_count}, F1={f1:.4f}")
+
+
+    if f1 > best_val_score:
+        best_val_score = f1
+        torch.save(net, model_path)
+        print(f"New best model saved to {model_path} with F1={f1:.4f}")
         print(f"Validation - Acc: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1: {f1:.4f}")
+        count_since_better_loss = 0
 
-        if f1 > best_val_score:
-            best_val_score = f1
-            torch.save(net, model_path)
-            print(f"New best model saved to {model_path} with F1={f1:.4f}")
+    else:
+        count_since_better_loss += 1
+        print(f"Trys since better loss {count_since_better_loss}")
+        if count_since_better_loss >= MAX_TRYS:
+            break
+
