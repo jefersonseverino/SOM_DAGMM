@@ -227,7 +227,8 @@ for epoch in range(epochs):
             threshold = np.percentile(out_val.cpu().numpy(), 45)
         elif args.dataset == 'kdd':
             threshold = np.percentile(out_val.cpu().numpy(), 20)
-        
+        elif args.dataset == 'credit_card':
+            threshold = np.percentile(out_val.cpu().numpy(), 20)
         # Get validation predictions
         pred_val = (out_val.cpu().numpy() > threshold).astype(int)
 
