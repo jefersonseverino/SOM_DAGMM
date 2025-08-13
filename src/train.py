@@ -60,9 +60,9 @@ save_path = os.path.join(args.dataset + "_" + args.features + "_" + args.embed +
 if args.dataset == 'credit_card':
     data = load_data('data/CreditCardFraud/creditcard.csv')
     Y = get_labels(data, args.dataset)
-
     data_benign = data[data['Class'] == 0].copy()
     data_malicious = data[data['Class'] == 1].copy()
+
 elif args.dataset == 'arrhythmia':
     names = [i for i in range(1,281)]
     data = load_data('data/arrhythmia.csv', names)
@@ -74,7 +74,7 @@ elif args.dataset == 'arrhythmia':
 elif args.dataset == 'kdd':
     names = [i for i in range(0,43)]
     data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-    categorical_cols = [1,2,3]
+    categorical_cols = [1,2,3,6,11,20,21]
 
     #encode categorical variables 
     if args.embed == 'one_hot':
@@ -185,7 +185,7 @@ dagmm = DAGMM(compression, estimation, gmm)
 
 train_np = train_data.numpy()
 # Use pretrained SOM
-som = som_train(train_np, x=10, y=10, sigma=1, learning_rate=args.lrsom, iters=10000)
+som = som_train(train_np, x=100, y=100, sigma=1, learning_rate=args.lrsom, iters=10000)
 
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=args.lrdagmm)
@@ -205,27 +205,32 @@ for epoch in range(epochs):
     net.train()
     running_loss = 0.0
     error_count = 0
+    
+    # Adicionando barra de progresso
+    with tqdm.tqdm(train_dataloader, unit="batch", desc=f"Epoch {epoch+1}/{epochs}") as tepoch:
+        for batch in tepoch:
+            data = batch[0]
+            optimizer.zero_grad()
 
-    for batch in train_dataloader:
-        data = batch[0]
-        optimizer.zero_grad()
+            out = net(data)
+            L_loss = compression.reconstruction_loss(data)
+            G_loss = mix.gmm_loss(out=out, L1=args.l1, L2=args.l2)
+            loss = L_loss + G_loss
 
-        out = net(data)
+            if torch.isfinite(loss):
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+            else:
+                error_count += 1
+                
+            # Atualiza a descrição da barra de progresso
+            tepoch.set_postfix({
+                'loss': running_loss/(tepoch.n+1),
+                'errors': error_count
+            })
 
-        L_loss = compression.reconstruction_loss(data)
-
-        # GMM likelihood loss
-        G_loss = mix.gmm_loss(out=out, L1=args.l1, L2=args.l2)
-
-        loss = L_loss + G_loss
-
-        if torch.isfinite(loss):
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-        else:
-            error_count += 1
-
+    # Restante do código permanece exatamente igual
     net.eval()
     with torch.no_grad():
         out_val = net(val_data)
@@ -242,16 +247,14 @@ for epoch in range(epochs):
 
     acc, prec, rec, f1, _ = get_scores(pred_val, Y_val)
 
-    print(f"Epoch {epoch+1}: Loss={running_loss:.4f}, Errors={error_count}, F1={f1:.4f}")
+    print(f"\nEpoch {epoch+1}: Loss={running_loss:.4f}, Errors={error_count}, F1={f1:.4f}")
 
-
-    if f1 > best_val_score:
+    if f1 > best_val_score + OFFSET:
         best_val_score = f1
         torch.save(net, model_path)
         print(f"New best model saved to {model_path} with F1={f1:.4f}")
         print(f"Validation - Acc: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1: {f1:.4f}")
         count_since_better_loss = 0
-
     else:
         count_since_better_loss += 1
         print(f"Trys since better loss {count_since_better_loss}")

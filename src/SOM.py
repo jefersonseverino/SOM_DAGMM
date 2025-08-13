@@ -74,7 +74,7 @@ class TorchSOM:
             q_error = self.quantization_error(data)
             if q_error < best_error:
                 print(f"    Novo melhor erro: {q_error}")
-                decay = 1 * 0.9
+                decay = 1 * 0.95
                 best_error = q_error
                 best_weights = self.weights.clone()
                 count_trys = 0

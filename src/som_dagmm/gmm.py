@@ -31,37 +31,23 @@ class GMM(nn.Module):
         self.num_mixtures = num_mixtures
         self.dimension_embedding = dimension_embedding
 
-        mixtures = [Mixture(dimension_embedding) for _ in range(num_mixtures)]
-        self.mixtures = nn.ModuleList(mixtures)
+        self.mixtures = nn.ModuleList([Mixture(dimension_embedding) for _ in range(num_mixtures)])
 
     def forward(self, inputs):
-        out = None
-        for mixture in self.mixtures:
-            to_add = mixture(inputs, with_log=False)
-            if out is None:
-                out = to_add
-            else:
-                out += to_add
-
+        all_outputs = torch.stack([m(inputs, with_log=False) for m in self.mixtures])
+        out = all_outputs.sum(dim=0)
         return -torch.log(out)
 
     def _update_mixtures_parameters(self, samples, mixtures_affiliations):
-        """
-        Args:
-            samples (Variable of shape [batch_size, dimension_embedding]):
-                typically the input of the estimation network. The points
-                in the embedding space.
-            mixtures_affiliations (Variable of shape [batch_size, num_mixtures])
-                the probability of affiliation of each sample to each mixture.
-                Typically the output of the estimation network.
-        """
         if not self.training:
-            # This function should not be used when we are in eval mode.
             return
 
+        # Transpose once for column-wise access (if num_mixtures is large)
+        affiliations_t = mixtures_affiliations.t()  # [num_mixtures, batch_size]
+        
         for i, mixture in enumerate(self.mixtures):
-            affiliations = mixtures_affiliations[:, i]
-            mixture._update_parameters(samples, affiliations)
+            # Direct column access from pre-transposed tensor
+            mixture._update_parameters(samples, affiliations_t[i])
 
 
 
@@ -69,25 +55,12 @@ class Mixture(nn.Module):
     def __init__(self, dimension_embedding):
         super().__init__()
         self.dimension_embedding = dimension_embedding
-
-        self.Phi = np.random.random([1])
-        self.Phi = torch.from_numpy(self.Phi).float()
-        self.Phi = nn.Parameter(self.Phi, requires_grad=False)
-
-        # Mu is the center/mean of the mixtures.
-        self.mu = 2.*np.random.random([dimension_embedding]) - 0.5
-        self.mu = torch.from_numpy(self.mu).float()
-        self.mu = nn.Parameter(self.mu, requires_grad=False)
-
-        # Sigma encodes the shape of the gaussian 'bubble' of a given mixture.
-        self.Sigma = np.eye(dimension_embedding, dimension_embedding)
-        self.Sigma = torch.from_numpy(self.Sigma).float()
-        self.Sigma = nn.Parameter(self.Sigma, requires_grad=False)
-
-        # We'll use this to augment the diagonal of Sigma and make sure it is
-        # inversible.
-        self.eps_Sigma = torch.FloatTensor(
-                        np.diag([1.e-8 for _ in range(dimension_embedding)]))
+        self.Phi = nn.Parameter(torch.rand(1), requires_grad=False)
+        self.mu = nn.Parameter(2 * torch.rand(dimension_embedding) - 0.5, 
+                            requires_grad=False)
+        self.Sigma = nn.Parameter(torch.eye(dimension_embedding),
+                                requires_grad=False)
+        self.eps_Sigma = torch.diag(torch.full((dimension_embedding,), 1e-8))
 
 
     def forward(self, samples, with_log=True):
@@ -115,55 +88,27 @@ class Mixture(nn.Module):
         return out
 
     def _update_parameters(self, samples, affiliations):
-        """
-        Args:
-            samples (Variable of shape [batch_size, dimension_embedding]):
-                typically the input of the estimation network. The points
-                in the embedding space.
-            mixtures_affiliations (Variable of shape [batch_size])
-                the probability of affiliation of each sample to each mixture.
-                Typically the output of the estimation network.
-        """
         if not self.training:
-            # This function should not be used when we are in eval mode.
             return
 
-        batch_size, _ = samples.shape
+        # Updating phi - versão vetorizada
+        self.Phi.data = torch.mean(affiliations).data
 
-        # Updating phi.
-        phi = torch.mean(affiliations)
-        self.Phi.data = phi.data
+        # Updating mu - versão vetorizada
+        weighted_samples = samples * affiliations.view(-1, 1)
+        self.mu.data = (weighted_samples.sum(dim=0) / (affiliations.sum() + 1e-12)).data
 
-        # Updating mu.
-        num = 0.
-        for i in range(batch_size):
-            z_i = samples[i, :]
-            gamma_i = affiliations[i]
-            num += gamma_i * z_i
-        denom = torch.sum(affiliations)
-        self.mu.data = (num / denom).data
+        # Updating Sigma - versão vetorizada
+        diff = samples - self.mu.unsqueeze(0)
+        weighted_diff = diff * torch.sqrt(affiliations).view(-1, 1)  # sqrt para estabilidade numérica
+        num = weighted_diff.t() @ weighted_diff
+        denom = affiliations.sum() + 1e-12
+        self.Sigma.data = (num / denom).data + self.eps_Sigma.to(num.device)
 
-        # Updating Sigma.
-        mu = self.mu
-        num = None
-        for i in range(batch_size):
-            z_i = samples[i, :]
-            gamma_i = affiliations[i]
-            diff = (z_i - mu).view(-1, 1)
-            to_add = gamma_i * torch.mm(diff, diff.view(1, -1))
-            if num is None:
-                num = to_add
-            else:
-                num += to_add
-
-        denom = torch.sum(affiliations)
-        self.Sigma.data = (num / denom).data + self.eps_Sigma
-
-    def gmm_loss (self, out, L1, L2):
-        term1 = (L1 * torch.sum(out))/len(out)
-        k, D = self.Sigma.size()
-        cov_diag = 0
-        for i in range(k):
-            cov_diag = cov_diag + torch.sum(1/self.Sigma.diag())
-        term2 = L2 * cov_diag
-        return (term1 + term2)
+    def gmm_loss(self, out, L1, L2):
+        term1 = L1 * out.mean()
+        
+        sigma_diag = torch.diagonal(self.Sigma)
+        term2 = L2 * torch.sum(1.0 / (sigma_diag + 1e-12))
+        
+        return term1 + term2

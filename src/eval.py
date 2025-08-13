@@ -50,7 +50,6 @@ batch_size = 1024
 if args.dataset == 'credit_card':
     data = load_data('data/CreditCardFraud/creditcard.csv')
     Y = get_labels(data, args.dataset)
-
     data_benign = data[data['Class'] == 0].copy()
     data_malicious = data[data['Class'] == 1].copy()
 
@@ -66,7 +65,7 @@ elif args.dataset == 'arrhythmia':
 elif args.dataset == 'kdd':
     names = [i for i in range(0,43)]
     data = load_data('data/NSL-KDD/KDDTrain+.txt', names)
-    categorical_cols = [1,2,3]
+    categorical_cols = [1,2,3,6,11,20,21]
     Y = get_labels(data, args.dataset)
 
     #encode categorical variables 
