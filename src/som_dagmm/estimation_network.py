@@ -18,24 +18,43 @@ class EstimationNetwork(nn.Module):
     """Defines a estimation network."""
     def __init__(self):
         super().__init__()
-        self.net = nn.Sequential(nn.Linear(6, 10),
-                                 nn.BatchNorm1d(10),
-                                 nn.Tanh(),
-                                 nn.Dropout(p=0.5),
-                                 nn.Linear(10, 150),
-                                 nn.BatchNorm1d(150),
-                                 nn.ReLU(),
-                                 nn.Linear(150, 300),
-                                 nn.BatchNorm1d(300),
-                                 nn.ReLU(),
-                                 nn.Linear(300, 150),
-                                 nn.BatchNorm1d(150),
-                                 nn.ReLU(),
-                                 nn.Linear(150, 10),
-                                 nn.BatchNorm1d(10),
-                                 nn.ReLU(),
-                                 nn.Linear(10, 2),
-                                 nn.Softmax(dim=1)
-                                 )
+        self.net = nn.Sequential(
+                                    nn.Linear(6, 32),  # Aumentei a primeira camada
+                                    nn.BatchNorm1d(32),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.3),   # Reduzi dropout
+                                    nn.Linear(32, 256), # Camadas mais largas
+                                    nn.BatchNorm1d(256),
+                                    nn.ReLU(),
+                                    nn.Linear(256, 128),
+                                    nn.BatchNorm1d(128),
+                                    nn.ReLU(),
+                                    nn.Linear(128, 2),  # Saída direta sem camadas extras
+                                    nn.Softmax(dim=1)
+                                )
     def forward(self, input):
         return self.net(input)
+    
+class EstimationNetworkWithAttention(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.base_net = nn.Sequential(
+            nn.Linear(6, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU()
+        )
+        self.attention = nn.MultiheadAttention(embed_dim=64, num_heads=2)
+        self.output_net = nn.Sequential(
+            nn.Linear(64, 32),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.Linear(32, 2),
+            nn.Softmax(dim=1)
+        )
+
+    def forward(self, x):
+        x = self.base_net(x)
+        x = x.unsqueeze(0)  # Shape: [1, batch_size, 64]
+        x, _ = self.attention(x, x, x)
+        x = x.squeeze(0)
+        return self.output_net(x)

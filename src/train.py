@@ -14,8 +14,8 @@ from torch import optim
 from torch.utils.data import TensorDataset, DataLoader
 
 from som_dagmm.model import DAGMM, SOM_DAGMM
-from som_dagmm.compression_network import CompressionNetwork
-from som_dagmm.estimation_network import EstimationNetwork
+from som_dagmm.compression_network import CompressionNetwork, VAENetwork, SkipCompressionNetwork
+from som_dagmm.estimation_network import EstimationNetwork, EstimationNetworkWithAttention
 from som_dagmm.gmm import GMM, Mixture
 
 from SOM import som_train, som_pred
@@ -178,7 +178,7 @@ val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 compression = CompressionNetwork(train_data.shape[1])
-estimation = EstimationNetwork()
+estimation = EstimationNetworkWithAttention()
 gmm = GMM(2,6)
 mix = Mixture(6)
 dagmm = DAGMM(compression, estimation, gmm)
@@ -190,7 +190,7 @@ som = som_train(train_np, x=100, y=100, sigma=1, learning_rate=args.lrsom, iters
 net = SOM_DAGMM(som, dagmm)
 optimizer =  optim.Adam(net.parameters(), lr=args.lrdagmm)
 
-OFFSET = 0.2
+OFFSET = 0.01
 MAX_TRYS = 5
 MAX_ATTEMPT = 5
 best_val_score = 0.0
