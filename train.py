@@ -96,6 +96,13 @@ train_data, val_data, Y_train, Y_val = train_test_split(data_benign, Y_benign, t
 val_data, test_data, Y_val, Y_test = train_test_split(val_data, Y_val, test_size=0.5, random_state=args.seed)
 val_mal_data, test_mal_data, Y_val_mal, Y_test_mal = train_test_split(data_malicious, Y_malicious, test_size=0.5, random_state=args.seed)
 
+print(f"contaminação: {args.contamination}")
+print(f"train_data: {len(train_data)}")
+print(f"val_data: {len(val_data)}")
+print(f"test_data: {len(test_data)}")
+print(f"train_data: {len(val_mal_data)}")
+print(f"train_data: {len(test_mal_data)}")
+
 # Concatenate benign and malicious data for validation and test sets
 val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
 test_data = pd.concat([test_data, test_mal_data], ignore_index=True)
@@ -228,7 +235,10 @@ for epoch in range(epochs):
         elif args.dataset == 'kdd':
             threshold = np.percentile(out_val.cpu().numpy(), 20)
         elif args.dataset == 'credit_card':
+            threshold = np.percentile(out_val.cpu().numpy(), 30)
+        elif args.dataset == 'arrhythmia':
             threshold = np.percentile(out_val.cpu().numpy(), 20)
+            
         # Get validation predictions
         pred_val = (out_val.cpu().numpy() > threshold).astype(int)
 
