@@ -100,8 +100,8 @@ print(f"contaminação: {args.contamination}")
 print(f"train_data: {len(train_data)}")
 print(f"val_data: {len(val_data)}")
 print(f"test_data: {len(test_data)}")
-print(f"train_data: {len(val_mal_data)}")
-print(f"train_data: {len(test_mal_data)}")
+print(f"val_mal_data: {len(val_mal_data)}")
+print(f"test_mal_data: {len(test_mal_data)}")
 
 # Concatenate benign and malicious data for validation and test sets
 val_data = pd.concat([val_data, val_mal_data], ignore_index=True)
@@ -235,9 +235,9 @@ for epoch in range(epochs):
         elif args.dataset == 'kdd':
             threshold = np.percentile(out_val.cpu().numpy(), 20)
         elif args.dataset == 'credit_card':
-            threshold = np.percentile(out_val.cpu().numpy(), 30)
+            threshold = np.percentile(out_val.cpu().numpy(), 94)
         elif args.dataset == 'arrhythmia':
-            threshold = np.percentile(out_val.cpu().numpy(), 20)
+            threshold = np.percentile(out_val.cpu().numpy(), 5)
             
         # Get validation predictions
         pred_val = (out_val.cpu().numpy() > threshold).astype(int)
